@@ -145,60 +145,54 @@ possession(team_A = "UTA", team_B = "GSW", printPlayByPlay = T, def_multiplier =
 #----------------------------------------------------------------------------------------------------
 #----------------------------------------------------------------------------------------------------
 #----------------------------------------------------------------------------------------------------
-# Monte Carlo Simulation Function
+# Monte Carlo Simulation
+home_team <- "LAC"
+away_team <- "GSW"
+nPossessions <- 100
+nGames <- 10
 
-MC_games <- function(home_team, away_team, nGames = 20, nPossessions = 100, def_multiplier = 1){
+
+home_team_scores <- NULL
+away_team_scores <- NULL
+for(j in 1:nGames){
+  playByPlay <- data.frame("Team" = character(), "Player" = character(), "Event" = character(), "Points" = double(), stringsAsFactors = F) 
+  for(i in 1:nPossessions){
+    possession(team_A = home_team, team_B = away_team, printPlayByPlay = F, def_multiplier = 1)
+    possession(team_A = away_team, team_B = home_team, printPlayByPlay = F, def_multiplier = 1)
+  }
+  home_team_scores <- c(home_team_scores, sum(playByPlay[playByPlay$Team == home_team,]$Points))
+  away_team_scores <- c(away_team_scores, sum(playByPlay[playByPlay$Team == away_team,]$Points))
   
-  home_score_running <- NULL
-  away_score_running <- NULL
-  
+  print(paste0(j, "/", nGames))
+}
+data.frame(home = home_team_scores, away = away_team_scores)
+
+
+
+#----------------------------------------------------------------------------------------------------
+#----------------------------------------------------------------------------------------------------
+#----------------------------------------------------------------------------------------------------
+#----------------------------------------------------------------------------------------------------
+#----------------------------------------------------------------------------------------------------
+# Monte Carlo Function
+MC_games <- function(home_team, away_team, nPossessions = 100, nGames = 10, def_multiplier = 1){
+  home_team_scores <- NULL
+  away_team_scores <- NULL
   for(j in 1:nGames){
     playByPlay <- data.frame("Team" = character(), "Player" = character(), "Event" = character(), "Points" = double(), stringsAsFactors = F) 
     for(i in 1:nPossessions){
-      possession(team_A = home_team, team_B = away_team, printPlayByPlay = F, def_multiplier = def_multiplier)
-      possession(team_A = away_team, team_B = home_team, printPlayByPlay = F, def_multiplier = def_multiplier)
+      possession(team_A = home_team, team_B = away_team, printPlayByPlay = F, def_multiplier = 1)
+      possession(team_A = away_team, team_B = home_team, printPlayByPlay = F, def_multiplier = 1)
     }
-    
-    home_score_running <- c(home_score_running, playByPlay[playByPlay$Team == home_team,]$Points %>% sum())
-    away_score_running <- c(away_score_running, playByPlay[playByPlay$Team == away_team,]$Points %>% sum())
+    home_team_scores <- c(home_team_scores, sum(playByPlay[playByPlay$Team == home_team,]$Points))
+    away_team_scores <- c(away_team_scores, sum(playByPlay[playByPlay$Team == away_team,]$Points))
     
     print(paste0(j, "/", nGames))
   }
-  
-  scores <- data.table("Home" = home_score_running, "Away" = away_score_running)
-  names(scores) <- c(home_team, away_team)
-  return(scores)
-  
+  data.frame(home = home_team_scores, away = away_team_scores)
 }
 
-#----------------------------------------------------------------------------------------------------
-# testing out the function
-players$Tm %>% unique() # who should play
-games1 <- MC_games(home_team = "UTA", away_team = "GSW", nGames = 10, nPossessions = 100, def_multiplier = 1)
-
-
-
-
-
-
-#----------------------------------------------------------------------------------------------------
-#----------------------------------------------------------------------------------------------------
-#----------------------------------------------------------------------------------------------------
-#----------------------------------------------------------------------------------------------------
-#----------------------------------------------------------------------------------------------------
-# scratch work
-home_team <- "UTA"
-away_team <- "GSW"
-
-playByPlay <- data.frame("Team" = character(), "Player" = character(), "Event" = character(), "Points" = double(), stringsAsFactors = F) 
-for(i in 1:100){
-  possession(team_A = home_team, team_B = away_team, printPlayByPlay = F, def_multiplier = 1)
-  possession(team_A = away_team, team_B = home_team, printPlayByPlay = F, def_multiplier = 1)
-}
-
-sum(playByPlay[playByPlay$Team == home_team,]$Points)
-sum(playByPlay[playByPlay$Team == away_team,]$Points)
-
-
+games1 <- MC_games(home_team = "LAC", away_team = "GSW", nPossessions = 100, nGames = 10, def_multiplier = 0)
+games1
 
 
