@@ -1,7 +1,7 @@
 # Feb 11, 2020
 
 # changes
-## Making more robust
+## Making more robust   
 
 # website with the data to scrape, for now it's just excel
 # https://www.basketball-reference.com/leagues/NBA_2020_totals.html
