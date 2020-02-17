@@ -1,7 +1,7 @@
 # Feb 11, 2020
 
 # changes
-## Making more robust   
+## Making more robust
 
 # website with the data to scrape, for now it's just excel
 # https://www.basketball-reference.com/leagues/NBA_2020_totals.html
@@ -138,6 +138,15 @@ possession <- function(team_A, team_B, printPlayByPlay = TRUE, def_multiplier = 
 # testing it out
 playByPlay <- data.frame("Team" = character(), "Player" = character(), "Event" = character(), "Points" = double(), stringsAsFactors = F) 
 possession(team_A = "UTA", team_B = "GSW", printPlayByPlay = T, def_multiplier = 1)
+possession(team_A = "GSW", team_B = "UTA", printPlayByPlay = T, def_multiplier = 1)
+
+# looping it for 1 game
+playByPlay <- data.frame("Team" = character(), "Player" = character(), "Event" = character(), "Points" = double(), stringsAsFactors = F) 
+for(i in 1:100){
+  possession(team_A = "UTA", team_B = "GSW", printPlayByPlay = T, def_multiplier = 1)
+  possession(team_A = "GSW", team_B = "UTA", printPlayByPlay = T, def_multiplier = 1)
+}
+View(playByPlay)
 
 
 #----------------------------------------------------------------------------------------------------
