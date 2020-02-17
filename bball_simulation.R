@@ -6,8 +6,11 @@
 libraries <- c("dplyr", "data.table", "openxlsx", "readxl", "ggplot2")
 sapply(libraries, require, character.only = T)
 
+# sourcing the scraping script:
+source("/Users/tj/OneDrive/Computer_Stuff/GitHub/NBA_Sim/NBA_DataScrape.R")
+
 # the data:
-players_all %>% select(Player, Tm, `3PA`, `3P%`, `2PA`, `2P%`, FTA, `FT%`, TOV, ORB, DRB, DWS, G, MP) %>% data.table()
+players <- players_all %>% select(Player, Tm, `3PA`, `3P%`, `2PA`, `2P%`, FTA, `FT%`, TOV, ORB, DRB, DWS, G, MP) %>% data.table()
 
 # getting each players probability of playing within each team
 players$DWS_zscore <- (players$DWS - mean(players$DWS))/sd(players$DWS)
