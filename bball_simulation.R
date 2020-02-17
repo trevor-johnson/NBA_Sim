@@ -1,28 +1,14 @@
-# Feb 11, 2020
+# Feb 16, 2020
 
-# changes
-## Making more robust
-
-# website with the data to scrape, for now it's just excel
-# https://www.basketball-reference.com/leagues/NBA_2020_totals.html
+# changes: instead of relying on a static excel table, we now scrape real time player data updated daily from basketball-reference.com
 
 # libraries needed
 libraries <- c("dplyr", "data.table", "openxlsx", "readxl", "ggplot2")
 sapply(libraries, require, character.only = T)
 
-# reading in the players data files
-file <- "/Users/tj/OneDrive/Computer_Stuff/R/Projects/Sports/player_stats.xlsx"
-dat1 <- read_excel(file, sheet = "allPlayers") %>% data.table()
-dat2 <- read_excel(file, sheet = "allPlayers_advanced") %>% data.table()
-key <- read_excel(file, sheet = "Key") %>% select(col, key) %>% data.table()
+# the data:
+players_all %>% select(Player, Tm, `3PA`, `3P%`, `2PA`, `2P%`, FTA, `FT%`, TOV, ORB, DRB, DWS, G, MP) %>% data.table()
 
-# cleaning datasets
-# joining the datasets. Player efficiency rating, true shooting percentage, devensive wins shares (wins attributed to defence), adding these to the dataset
-players <- dat1 %>% left_join(select(dat2, Player, Tm, PER, `TS%`, DWS), by = c("Player", "Tm")) %>% 
-  select(Player, Tm, `3PA`, `3P%`, `2PA`, `2P%`, FTA, `FT%`, TOV, ORB, DRB, DWS, G, MP) %>%
-  data.table()
-# replacing NA's w/ 0's
-players[is.na(players)] <- 0
 # getting each players probability of playing within each team
 players$DWS_zscore <- (players$DWS - mean(players$DWS))/sd(players$DWS)
 players$DWS_scaled <- (players$DWS_zscore - min(players$DWS_zscore)) / (max(players$DWS_zscore) - min(players$DWS_zscore))
