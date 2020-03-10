@@ -145,7 +145,7 @@ View(playByPlay)
 #----------------------------------------------------------------------------------------------------
 # Monte Carlo Simulation
 home_team <- "LAC"
-away_team <- "GSW"
+away_team <- "LAL"
 nPossessions <- 100
 nGames <- 10
 
@@ -164,6 +164,59 @@ for(j in 1:nGames){
   print(paste0(j, "/", nGames))
 }
 data.frame(home = home_team_scores, away = away_team_scores)
+
+
+#----------------------------------------------------------------------------------------------------
+# other teams
+home_team <- "UTA"
+away_team <- "BOS"
+nPossessions <- 100
+nGames <- 10
+
+
+home_team_scores <- NULL
+away_team_scores <- NULL
+for(j in 1:nGames){
+  playByPlay <- data.frame("Team" = character(), "Player" = character(), "Event" = character(), "Points" = double(), stringsAsFactors = F) 
+  for(i in 1:nPossessions){
+    possession(team_A = home_team, team_B = away_team, printPlayByPlay = F, def_multiplier = 1)
+    possession(team_A = away_team, team_B = home_team, printPlayByPlay = F, def_multiplier = 1)
+  }
+  home_team_scores <- c(home_team_scores, sum(playByPlay[playByPlay$Team == home_team,]$Points))
+  away_team_scores <- c(away_team_scores, sum(playByPlay[playByPlay$Team == away_team,]$Points))
+  
+  print(paste0(j, "/", nGames))
+}
+dat <- data.frame(home = home_team_scores, away = away_team_scores)
+mean(dat$home - dat$away) #UTA beats boston by .4 pts
+
+#----------------------------------------------------------------------------------------------------
+# other teams
+home_team <- "MIL"
+away_team <- "DET"
+nPossessions <- 100
+nGames <- 100
+
+x <- Sys.time()
+home_team_scores <- NULL
+away_team_scores <- NULL
+for(j in 1:nGames){
+  playByPlay <- data.frame("Team" = character(), "Player" = character(), "Event" = character(), "Points" = double(), stringsAsFactors = F) 
+  for(i in 1:nPossessions){
+    possession(team_A = home_team, team_B = away_team, printPlayByPlay = F, def_multiplier = 1)
+    possession(team_A = away_team, team_B = home_team, printPlayByPlay = F, def_multiplier = 1)
+  }
+  home_team_scores <- c(home_team_scores, sum(playByPlay[playByPlay$Team == home_team,]$Points))
+  away_team_scores <- c(away_team_scores, sum(playByPlay[playByPlay$Team == away_team,]$Points))
+  
+  print(paste0(j, "/", nGames))
+}
+Sys.time() - x
+dat <- data.frame(home = home_team_scores, away = away_team_scores)
+mean(dat$home - dat$away) 
+
+
+
 
 
 
