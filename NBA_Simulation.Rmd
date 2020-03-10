@@ -1,0 +1,243 @@
+---
+title: "NBA Simulation"
+author: "Trevor Johnson"
+date: "3/10/2020"
+output: html_document
+---
+
+Libraries needed
+```{r, results = 'hide', message=FALSE, waring = FALSE}
+libraries <- c("XML", "rvest", "dplyr", "data.table", "DT")
+sapply(libraries, require, character.only = T)
+```
+
+
+Scrape real time data
+```{r, warning=FALSE, message=FALSE, results='hide', eval=FALSE}
+
+# https://www.basketball-reference.com/leagues/NBA_2020_totals.html
+# you can change the year to get historical stats
+
+# libraries
+libraries <- c("XML", "rvest", "dplyr", "data.table")
+sapply(libraries, require, character.only = T)
+
+
+# Scraping the regular player data
+url <- "https://www.basketball-reference.com/leagues/NBA_2020_totals.html"
+css <- "td" # other CSS options: "#div_totals_stats", ".right , .left , .center"
+stats <- rvest::html_text(rvest::html_nodes(xml2::read_html(url), css))
+
+# each df should have these 29 fields:
+colHeaders <- c("Player", "Pos", "Age", "Tm", "G", "GS", "MP", "FG", "FGA", "FG%", "3P", "3PA", "3P%", "2P", "2PA", "2P%", "eFG%", "FT", "FTA", "FT%", "ORB", "DRB", "TRB",	"AST", "STL", "BLK", "TOV", "PF", "PTS")
+
+# Every 29 elements in the large "stats" vector is a new row, so looping through to convert to data.frame format
+df <- cbind(stats[seq(1, 600*29, by = 29)], stats[seq(2, 600*29, by = 29)])
+for(i in 3:29){
+  df <- cbind(df, stats[seq(i, 600*29, by = 29)])
+}
+df <- data.frame(df)
+names(df) <- colHeaders
+
+# cleaning up the data.frame
+df <- df[!is.na(df$Player),] # deleting extra rows
+# changing column types
+df[colHeaders[1:29]] <- sapply(df[colHeaders[1:29]], as.character)
+df[df == ""] <- "0" # replacing missing values w/ 0's
+df[colHeaders[c(3, 5:29)]] <- sapply(df[colHeaders[c(3, 5:29)]], as.numeric)
+totals <- df
+
+
+
+# now scraping the advanced table
+# Scraping the data
+url <- "https://www.basketball-reference.com/leagues/NBA_2020_advanced.html"
+css <- "td" # other CSS options: "#div_totals_stats", ".right , .left , .center"
+stats <- rvest::html_text(rvest::html_nodes(xml2::read_html(url), css))
+
+# there are 2 columns with blank data in the dataset
+colHeaders <- c("Player", "Pos", "Age", "Tm", "G", 'MP', "PER", "TS%", "3PAr", "FTr", "ORB%", "DRB%", "TRB%", "AST%", "STL%", "BLK%", "TOV%", "USG%", "blank1", "OWS", "DWS", "WS", "WS/48", "blank2", "OBPM", "DBPM", "BPM", "VORP")
+
+# new player every 28 records
+df <- cbind(stats[seq(1, 600*28, by = 28)], stats[seq(2, 600*28, by = 28)])
+for(i in 3:28){
+  df <- cbind(df, stats[seq(i, 600*28, by = 28)])
+}
+df <- data.frame(df)
+names(df) <- colHeaders
+
+# data clean
+df <- df[!is.na(df$Player),] # deleting extra rows
+df[colHeaders[1:28]] <- sapply(df[colHeaders[c(1:28)]], as.character)
+df[df == ""] <- "0" # replacing missing values w/ 0's
+df[colHeaders[c(3, 5:28)]] <- sapply(df[colHeaders[c(3, 5:28)]], as.numeric)
+advanced <- df
+
+#----------------------------------------------------------------------------------------------------
+# joining the two tables
+players_all <- left_join(totals, select(advanced, Player, Tm, PER, `TS%`, DWS), by = c("Player", "Tm"))
+
+#Saving the output for reproducable results
+#write.csv(players_all, "/Users/tj/Documents/Data/NBA/PlayerStats_2020.03.10.csv", row.names = FALSE)
+
+```
+
+Cleaning the data a bit:
+```{r}
+players_all <- fread("/Users/tj/Documents/Data/NBA/PlayerStats_2020.03.10.csv")
+players <- players_all %>% select(Player, Tm, `3PA`, `3P%`, `2PA`, `2P%`, FTA, `FT%`, TOV, ORB, DRB, DWS, G, MP) %>% data.table()
+# getting each players probability of playing within each team
+players$DWS_zscore <- (players$DWS - mean(players$DWS))/sd(players$DWS)
+players$DWS_scaled <- (players$DWS_zscore - min(players$DWS_zscore)) / (max(players$DWS_zscore) - min(players$DWS_zscore))
+players$DWS_scaled <- players$DWS_scaled - mean(players$DWS_scaled)
+players$DWS_zscore <- NULL
+```
+
+The function to simulate a single posession:
+```{r}
+# possession function
+## read this as team A is on offense, team B is on defense
+
+# need to initialize this outside of the function to reset, then loop the possession function
+playByPlay <- data.frame("Team" = character(), "Player" = character(), "Event" = character(), "Points" = double(), stringsAsFactors = F) 
+
+# team_A = team w/ the ball
+# team_B = team defending
+# printPlayByPlay = bool, if you run the function once, it's nice to set this to TRUE
+# def_multiplier = some number, 0 means defense has no impact, 1 means a regular impact, 2 means 2x, 3 = 3x, etc.
+
+possession <- function(team_A, team_B, printPlayByPlay = TRUE, def_multiplier = 1){
+  
+  team_A1 = players[Tm == team_A]
+  team_B1 = players[Tm == team_B]
+  
+  # using total season minutes played (MP) as play probability
+  team_A5 = team_A1[Player %in% sample(team_A1$Player, size = 5, replace = FALSE, prob = team_A1$MP)]
+  team_B5 = team_B1[Player %in% sample(team_B1$Player, size = 5, replace = FALSE, prob = team_B1$MP)]
+  
+  
+  # action
+  possible_actions <- c(paste0(1:5, "_2P%"), paste0(1:5, "_3P%"), paste0(1:5, "_FT%"), paste0(1:5, "_TOV"))
+  prob_weights <- c(team_A5$`2PA`, team_A5$`3PA`, team_A5$FTA, team_A5$TOV)
+  
+  rebound_tbl <- data.table(Player = c(team_A5$Player, team_B5$Player), Tm = c(team_A5$Tm, team_B5$Tm), Rebounds = c(team_A5$ORB, team_B5$DRB))
+  
+  # away team's defensive impact
+  defImpact <- mean(team_B5$DWS_scaled)*-1*def_multiplier
+  
+  # what happens? 
+  # Initialize these variables to begin, and they will eventually reset
+  # event <- "miss"
+  rebound <- "homeRebound"
+  
+  # the actual play
+  while(rebound == "homeRebound"){
+    
+    theAction <- sample(possible_actions, size = 1, prob = prob_weights)
+    theAction2 <- c(substr(theAction, 1, 1), substr(theAction, 3, nchar(theAction))) 
+    prb <- (team_A5[as.numeric(theAction2[1]),] %>% select(theAction2[2]))*(1+defImpact) #def impact happens here, only impacts shooting, is already inherent in rebound counts
+    
+    if(theAction2[2] == "TOV"){
+      rebound <- "awayRebound" # to end the while loop
+      assign("playByPlay", rbind(playByPlay, data.frame("Team" = team_A, "Player" = team_A5[as.numeric(theAction2[1]),]$Player, "Event" = "Turnover", "Points" = 0, stringsAsFactors = F)), envir = parent.frame()) # save event
+      
+    }else if(theAction2[2] == "2P%"){
+      
+      pt <- sample(c(0, 2), size = 1, prob = c(1-prb, prb))
+      assign("playByPlay", rbind(playByPlay, data.frame("Team" = team_A, "Player" = team_A5[as.numeric(theAction2[1]),]$Player, "Event" = "2pt", "Points" = pt, stringsAsFactors = F)), envir = parent.frame()) # save event
+      
+      if(pt == 0){
+        
+        rebound_ind <- sample(1:10, size = 1, prob = rebound_tbl$Rebounds)
+        if(rebound_ind <= 5){rebound <- "homeRebound"}else{rebound <- "awayRebound"}
+        assign("playByPlay", rbind(playByPlay, data.frame("Team" = rebound_tbl[rebound_ind,]$Tm, "Player" = rebound_tbl[rebound_ind,]$Player, "Event" = "Rebound", "Points" = 0, stringsAsFactors = F)), envir = parent.frame()) 
+        
+      }else{
+        rebound <- "awayRebound" # to end while loop
+      }
+      
+    }else if(theAction2[2] == "3P%"){
+      
+      pt <- sample(c(0, 3), size = 1, prob = c(1-prb, prb))
+      assign("playByPlay", rbind(playByPlay, data.frame("Team" = team_A, "Player" = team_A5[as.numeric(theAction2[1]),]$Player, "Event" = "3pt", "Points" = pt, stringsAsFactors = F)), envir = parent.frame()) # save event
+      if(pt == 0){
+        
+        rebound_ind <- sample(1:10, size = 1, prob = rebound_tbl$Rebounds)
+        if(rebound_ind <= 5){rebound <- "homeRebound"}else{rebound <- "awayRebound"}
+        assign("playByPlay", rbind(playByPlay, data.frame("Team" = rebound_tbl[rebound_ind,]$Tm, "Player" = rebound_tbl[rebound_ind,]$Player, "Event" = "Rebound", "Points" = 0, stringsAsFactors = F)), envir = parent.frame()) 
+        
+      }else{
+        rebound <- "awayRebound"
+      }
+      
+    }else if(theAction2[2] == "FT%"){
+      
+      pt <- sample(c(0, 1), size = 1, prob = c(1-prb, prb))
+      assign("playByPlay", rbind(playByPlay, data.frame("Team" = team_A, "Player" = team_A5[as.numeric(theAction2[1]),]$Player, "Event" = "FT", "Points" = pt, stringsAsFactors = F)), envir = parent.frame()) # save event
+      
+      pt <- sample(c(0, 1), size = 1, prob = c(1-prb, prb))
+      assign("playByPlay", rbind(playByPlay, data.frame("Team" = team_A, "Player" = team_A5[as.numeric(theAction2[1]),]$Player, "Event" = "FT", "Points" = pt, stringsAsFactors = F)), envir = parent.frame()) # save event
+      if(pt == 0){
+        
+        rebound_ind <- sample(1:10, size = 1, prob = rebound_tbl$Rebounds)
+        if(rebound_ind <= 5){rebound <- "homeRebound"}else{rebound <- "awayRebound"}
+        assign("playByPlay", rbind(playByPlay, data.frame("Team" = rebound_tbl[rebound_ind,]$Tm, "Player" = rebound_tbl[rebound_ind,]$Player, "Event" = "Rebound", "Points" = 0, stringsAsFactors = F)), envir = parent.frame()) 
+        
+      }else{
+        rebound <- "awayRebound" # tto end while loop
+      }
+    }
+  }# end while
+  
+  if(printPlayByPlay == TRUE){print(playByPlay)}
+  
+}
+```
+
+
+Testing it out
+```{r}
+# testing it out
+playByPlay <- data.frame("Team" = character(), "Player" = character(), "Event" = character(), "Points" = double(), stringsAsFactors = F) 
+possession(team_A = "UTA", team_B = "TOR", printPlayByPlay = T, def_multiplier = 1)
+possession(team_A = "TOR", team_B = "UTA", printPlayByPlay = T, def_multiplier = 1)
+
+# looping it for 1 game
+playByPlay <- data.frame("Team" = character(), "Player" = character(), "Event" = character(), "Points" = double(), stringsAsFactors = F) 
+for(i in 1:100){
+  possession(team_A = "UTA", team_B = "TOR", printPlayByPlay = F, def_multiplier = 1)
+  possession(team_A = "TOR", team_B = "UTA", printPlayByPlay = F, def_multiplier = 1)
+}
+print(playByPlay)
+```
+
+
+
+Running a Monte Carlo Simulation
+```{r}
+# Monte Carlo Simulation
+home_team <- "LAC"
+away_team <- "LAL"
+nPossessions <- 100
+nGames <- 10
+
+
+home_team_scores <- NULL
+away_team_scores <- NULL
+for(j in 1:nGames){
+  playByPlay <- data.frame("Team" = character(), "Player" = character(), "Event" = character(), "Points" = double(), stringsAsFactors = F) 
+  for(i in 1:nPossessions){
+    possession(team_A = home_team, team_B = away_team, printPlayByPlay = F, def_multiplier = 1)
+    possession(team_A = away_team, team_B = home_team, printPlayByPlay = F, def_multiplier = 1)
+  }
+  home_team_scores <- c(home_team_scores, sum(playByPlay[playByPlay$Team == home_team,]$Points))
+  away_team_scores <- c(away_team_scores, sum(playByPlay[playByPlay$Team == away_team,]$Points))
+  
+  print(paste0(j, "/", nGames)) #counter to keep track of how the simulation is going
+}
+data.frame(home = home_team_scores, away = away_team_scores)
+
+```
+
+
+

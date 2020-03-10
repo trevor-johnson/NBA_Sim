@@ -10,6 +10,7 @@ sapply(libraries, require, character.only = T)
 source("/Users/tj/OneDrive/Computer_Stuff/GitHub/NBA_Sim/NBA_DataScrape.R")
 
 # the data:
+players_all <- fread("/Users/tj/Documents/Data/NBA/PlayerStats_2020.03.10.csv")
 players <- players_all %>% select(Player, Tm, `3PA`, `3P%`, `2PA`, `2P%`, FTA, `FT%`, TOV, ORB, DRB, DWS, G, MP) %>% data.table()
 
 # getting each players probability of playing within each team
@@ -132,9 +133,10 @@ possession(team_A = "GSW", team_B = "UTA", printPlayByPlay = T, def_multiplier =
 # looping it for 1 game
 playByPlay <- data.frame("Team" = character(), "Player" = character(), "Event" = character(), "Points" = double(), stringsAsFactors = F) 
 for(i in 1:100){
-  possession(team_A = "UTA", team_B = "GSW", printPlayByPlay = T, def_multiplier = 1)
-  possession(team_A = "GSW", team_B = "UTA", printPlayByPlay = T, def_multiplier = 1)
+  possession(team_A = "UTA", team_B = "GSW", printPlayByPlay = F, def_multiplier = 1)
+  possession(team_A = "GSW", team_B = "UTA", printPlayByPlay = F, def_multiplier = 1)
 }
+playByPlay
 View(playByPlay)
 
 
@@ -164,7 +166,6 @@ for(j in 1:nGames){
   print(paste0(j, "/", nGames))
 }
 data.frame(home = home_team_scores, away = away_team_scores)
-
 
 #----------------------------------------------------------------------------------------------------
 # other teams
@@ -247,3 +248,33 @@ games1 <- MC_games(home_team = "LAC", away_team = "GSW", nPossessions = 100, nGa
 games1
 
 
+#----------------------------------------------------------------------------------------------------
+#----------------------------------------------------------------------------------------------------
+#----------------------------------------------------------------------------------------------------
+#----------------------------------------------------------------------------------------------------
+#----------------------------------------------------------------------------------------------------
+# Monte Carlo Simulation 2.0
+# saving the results a bit differently so we can see player stats over the games
+home_team <- "LAC"
+away_team <- "LAL"
+nPossessions <- 100
+nGames <- 10
+
+
+home_team_scores <- NULL
+away_team_scores <- NULL
+playByPlay_overall <- data.frame("Team" = character(), "Player" = character(), "Event" = character(), "Points" = double(), stringsAsFactors = F, game = double()) 
+
+for(j in 1:nGames){
+  playByPlay <- data.frame("Team" = character(), "Player" = character(), "Event" = character(), "Points" = double(), stringsAsFactors = F) 
+  for(i in 1:nPossessions){
+    possession(team_A = home_team, team_B = away_team, printPlayByPlay = F, def_multiplier = 1)
+    possession(team_A = away_team, team_B = home_team, printPlayByPlay = F, def_multiplier = 1)
+  }
+  playByPlay_overall <- rbind(playByPlay_overall, cbind(playByPlay, data.frame(game = j)))
+  print(paste0(j, "/", nGames))
+}
+playByPlay_overall2 <- data.table(playByPlay_overall)
+playByPlay_overall2[,.(sum(Points)), by = c("Team", "game")] %>% dcast.data.table(game ~ Team)
+
+playByPlay_overall2[,.(sum(Points)), by = "Player"]

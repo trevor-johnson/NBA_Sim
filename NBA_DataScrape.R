@@ -64,5 +64,5 @@ advanced <- df
 # joining the two tables
 players_all <- left_join(totals, select(advanced, Player, Tm, PER, `TS%`, DWS), by = c("Player", "Tm"))
 
-
+write.csv(players_all, "/Users/tj/Documents/Data/NBA/PlayerStats_2020.03.10.csv", row.names = FALSE)
 
