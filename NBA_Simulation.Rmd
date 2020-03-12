@@ -1,15 +1,19 @@
 ---
 title: "NBA Simulation"
 author: "Trevor Johnson"
-date: "3/10/2020"
-output: html_document
+date: "3/11/2020"
+output:
+  prettydoc::html_pretty:
+    theme: Leonids
+    highlight: github
 ---
-
-Simulating NBA games and predicting wins using Monte Carlo Simulation
 
 # Start
 
+Simulating NBA games and predicting wins using Monte Carlo Simulation
+
 Libraries needed
+
 ```{r, results = 'hide', message=FALSE, waring = FALSE}
 libraries <- c("XML", "rvest", "dplyr", "data.table", "DT", "ggplot2", "patchwork")
 sapply(libraries, require, character.only = T)
@@ -100,7 +104,7 @@ players$DWS_scaled <- players$DWS_scaled - mean(players$DWS_scaled)
 players$DWS_zscore <- NULL
 ```
 
-# Posession Function
+# Possession Function
 
 ```{r}
 # possession function
