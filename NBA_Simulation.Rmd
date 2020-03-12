@@ -206,7 +206,7 @@ Testing it out
 
 ```{r}
 # testing it out
-set.seed(1)
+set.seed(123)
 playByPlay <- data.frame("Team" = character(), "Player" = character(), "Event" = character(), "Points" = double(), stringsAsFactors = F) 
 possession(team_A = "UTA", team_B = "TOR", printPlayByPlay = F, def_multiplier = 1)
 possession(team_A = "TOR", team_B = "UTA", printPlayByPlay = T, def_multiplier = 1)
@@ -224,16 +224,10 @@ datatable(playByPlay)
 
 ```{r, warning = FALSE, message=FALSE}
 # Monte Carlo Simulation
-home_team <- "LAC"
-away_team <- "LAL"
+home_team <- "LAL"
+away_team <- "UTA"
 nPossessions <- 100
-nGames <- 10
-
-home_team <- "LAC"
-away_team <- "LAL"
-nPossessions <- 100
-nGames <- 10
-
+nGames <- 20
 
 home_team_scores <- NULL
 away_team_scores <- NULL
@@ -246,7 +240,7 @@ for(j in 1:nGames){
     possession(team_A = away_team, team_B = home_team, printPlayByPlay = F, def_multiplier = 1)
   }
   playByPlay_overall <- rbind(playByPlay_overall, cbind(playByPlay, data.frame(game = j)))
-  print(paste0(j, "/", nGames))
+  #print(paste0(j, "/", nGames))
 }
 playByPlay_overall2 <- data.table(playByPlay_overall)
 x <- playByPlay_overall2[,.(sum(Points)), by = c("Team", "game")] %>% dcast.data.table(game ~ Team)
@@ -257,21 +251,19 @@ print(x)
 See which team won more games and by how much
 
 ```{r}
-x$spread <- x$LAL - x$LAC
+x$spread <- x$LAL - x$UTA
 x2 <- x[,win := ifelse(spread > 0, 1, 0)]
 ```
 
-Lakers won `r sum(x2$win)`/10 games against the Clippers, and win by `r mean(x2$spread)` points.
+Lakers won `r sum(x2$win)`/`r nGames` games against the Jazz, and win by `r mean(x2$spread)` points.
 
-Average points per game accross 10 games data viz
+Average points per game accross `r nGames` games data viz
 
 ```{r}
 scores <- playByPlay_overall2[,.(sum(Points)), by = c("Team", "Player")]
-scores$PPG <- scores$V1/10
-p1 <- scores[Team == "LAL",] %>% ggplot(aes(x = Player, y = PPG)) + geom_col() + coord_flip() + theme_bw() + theme(axis.title = element_blank(), panel.border = element_blank())
-p2 <- scores[Team == "LAC",] %>% ggplot(aes(x = Player, y = PPG)) + geom_col() + coord_flip() + theme_bw() + theme(axis.title = element_blank(), panel.border = element_blank())
+scores$PPG <- scores$V1/nGames
+p1 <- scores[Team == home_team,] %>% ggplot(aes(x = Player, y = PPG)) + geom_col() + coord_flip() + theme_bw() + theme(axis.title = element_blank(), panel.border = element_blank())
+p2 <- scores[Team == away_team,] %>% ggplot(aes(x = Player, y = PPG)) + geom_col() + coord_flip() + theme_bw() + theme(axis.title = element_blank(), panel.border = element_blank())
 p1 | p2
 ```
-
-
 
