@@ -3,7 +3,8 @@
 # changes: instead of relying on a static excel table, we now scrape real time player data updated daily from basketball-reference.com
 
 # libraries needed
-libraries <- c("dplyr", "data.table", "openxlsx", "readxl", "ggplot2")
+devtools::install_github("thomasp85/patchwork")
+libraries <- c("dplyr", "data.table", "openxlsx", "readxl", "ggplot2", "patchwork")
 sapply(libraries, require, character.only = T)
 
 # sourcing the scraping script:
@@ -275,6 +276,17 @@ for(j in 1:nGames){
   print(paste0(j, "/", nGames))
 }
 playByPlay_overall2 <- data.table(playByPlay_overall)
-playByPlay_overall2[,.(sum(Points)), by = c("Team", "game")] %>% dcast.data.table(game ~ Team)
+x <- playByPlay_overall2[,.(sum(Points)), by = c("Team", "game")] %>% dcast.data.table(game ~ Team)
 
-playByPlay_overall2[,.(sum(Points)), by = "Player"]
+x$spread <- x$LAL - x$LAC
+x2 <- x[,win := ifelse(spread > 0, 1, 0)]
+
+
+scores <- playByPlay_overall2[,.(sum(Points)), by = c("Team", "Player")]
+scores$PPG <- scores$V1/10
+p1 <- scores[Team == "LAL",] %>% ggplot(aes(x = Player, y = PPG)) + geom_col() + coord_flip() + theme_bw() + theme(axis.title = element_blank(), panel.border = element_blank())
+p2 <- scores[Team == "LAC",] %>% ggplot(aes(x = Player, y = PPG)) + geom_col() + coord_flip() + theme_bw() + theme(axis.title = element_blank(), panel.border = element_blank())
+p1 | p2
+
+
+

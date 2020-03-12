@@ -5,12 +5,17 @@ date: "3/10/2020"
 output: html_document
 ---
 
+Simulating NBA games and predicting wins using Monte Carlo Simulation
+
+# Start
+
 Libraries needed
 ```{r, results = 'hide', message=FALSE, waring = FALSE}
-libraries <- c("XML", "rvest", "dplyr", "data.table", "DT")
+libraries <- c("XML", "rvest", "dplyr", "data.table", "DT", "ggplot2", "patchwork")
 sapply(libraries, require, character.only = T)
 ```
 
+# Gathering Data
 
 Scrape real time data
 ```{r, warning=FALSE, message=FALSE, results='hide', eval=FALSE}
@@ -82,7 +87,9 @@ players_all <- left_join(totals, select(advanced, Player, Tm, PER, `TS%`, DWS), 
 
 ```
 
-Cleaning the data a bit:
+
+# Data Cleaning
+
 ```{r}
 players_all <- fread("/Users/tj/Documents/Data/NBA/PlayerStats_2020.03.10.csv")
 players <- players_all %>% select(Player, Tm, `3PA`, `3P%`, `2PA`, `2P%`, FTA, `FT%`, TOV, ORB, DRB, DWS, G, MP) %>% data.table()
@@ -93,7 +100,8 @@ players$DWS_scaled <- players$DWS_scaled - mean(players$DWS_scaled)
 players$DWS_zscore <- NULL
 ```
 
-The function to simulate a single posession:
+# Posession Function
+
 ```{r}
 # possession function
 ## read this as team A is on offense, team B is on defense
@@ -194,12 +202,13 @@ possession <- function(team_A, team_B, printPlayByPlay = TRUE, def_multiplier = 
 }
 ```
 
-
 Testing it out
+
 ```{r}
 # testing it out
+set.seed(1)
 playByPlay <- data.frame("Team" = character(), "Player" = character(), "Event" = character(), "Points" = double(), stringsAsFactors = F) 
-possession(team_A = "UTA", team_B = "TOR", printPlayByPlay = T, def_multiplier = 1)
+possession(team_A = "UTA", team_B = "TOR", printPlayByPlay = F, def_multiplier = 1)
 possession(team_A = "TOR", team_B = "UTA", printPlayByPlay = T, def_multiplier = 1)
 
 # looping it for 1 game
@@ -208,14 +217,18 @@ for(i in 1:100){
   possession(team_A = "UTA", team_B = "TOR", printPlayByPlay = F, def_multiplier = 1)
   possession(team_A = "TOR", team_B = "UTA", printPlayByPlay = F, def_multiplier = 1)
 }
-print(playByPlay)
+datatable(playByPlay)
 ```
 
-
-
-Running a Monte Carlo Simulation
-```{r}
 # Monte Carlo Simulation
+
+```{r, warning = FALSE, message=FALSE}
+# Monte Carlo Simulation
+home_team <- "LAC"
+away_team <- "LAL"
+nPossessions <- 100
+nGames <- 10
+
 home_team <- "LAC"
 away_team <- "LAL"
 nPossessions <- 100
@@ -224,19 +237,40 @@ nGames <- 10
 
 home_team_scores <- NULL
 away_team_scores <- NULL
+playByPlay_overall <- data.frame("Team" = character(), "Player" = character(), "Event" = character(), "Points" = double(), stringsAsFactors = F, game = double()) 
+
 for(j in 1:nGames){
   playByPlay <- data.frame("Team" = character(), "Player" = character(), "Event" = character(), "Points" = double(), stringsAsFactors = F) 
   for(i in 1:nPossessions){
     possession(team_A = home_team, team_B = away_team, printPlayByPlay = F, def_multiplier = 1)
     possession(team_A = away_team, team_B = home_team, printPlayByPlay = F, def_multiplier = 1)
   }
-  home_team_scores <- c(home_team_scores, sum(playByPlay[playByPlay$Team == home_team,]$Points))
-  away_team_scores <- c(away_team_scores, sum(playByPlay[playByPlay$Team == away_team,]$Points))
-  
-  print(paste0(j, "/", nGames)) #counter to keep track of how the simulation is going
+  playByPlay_overall <- rbind(playByPlay_overall, cbind(playByPlay, data.frame(game = j)))
+  print(paste0(j, "/", nGames))
 }
-data.frame(home = home_team_scores, away = away_team_scores)
+playByPlay_overall2 <- data.table(playByPlay_overall)
+x <- playByPlay_overall2[,.(sum(Points)), by = c("Team", "game")] %>% dcast.data.table(game ~ Team)
 
+print(x)
+```
+
+See which team won more games and by how much
+
+```{r}
+x$spread <- x$LAL - x$LAC
+x2 <- x[,win := ifelse(spread > 0, 1, 0)]
+```
+
+Lakers won `r sum(x2$win)`/10 games against the Clippers, and win by `r mean(x2$spread)` points.
+
+Average points per game accross 10 games data viz
+
+```{r}
+scores <- playByPlay_overall2[,.(sum(Points)), by = c("Team", "Player")]
+scores$PPG <- scores$V1/10
+p1 <- scores[Team == "LAL",] %>% ggplot(aes(x = Player, y = PPG)) + geom_col() + coord_flip() + theme_bw() + theme(axis.title = element_blank(), panel.border = element_blank())
+p2 <- scores[Team == "LAC",] %>% ggplot(aes(x = Player, y = PPG)) + geom_col() + coord_flip() + theme_bw() + theme(axis.title = element_blank(), panel.border = element_blank())
+p1 | p2
 ```
 
 
